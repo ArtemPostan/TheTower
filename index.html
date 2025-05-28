@@ -39,7 +39,7 @@
     </div>
     <div id="loading-cover" style="display:none;">
         <div id="unity-loading-bar">
-            
+            <div id="unity-logo"><img src="Images/logo.png"></div>
             <div id="unity-progress-bar-empty" style="display: none;">
                 <div id="unity-progress-bar-full"></div>
             </div>
@@ -87,11 +87,11 @@
 
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
             container.className = "unity-mobile";
-            
+            config.devicePixelRatio = 1;
         }
 
         // The background image when loading the game. When building a build, the code changes depending on the project settings.
-        
+        loadingCover.style.background = "url('Images/background.png') center / cover";
         loadingCover.style.display = "";
 
         let StartUnityInstance;
@@ -217,26 +217,12 @@
                 ysdk = await YaGames.init();
 
                 // Additional init0 modules
-InterAdvShow();
-
-await RequestingEnvironmentData();
-LogStyledMessage('Init EnvirData ysdk');
-
 
                 // Additional init1 modules
 
                 // Additional init2 modules
-await InitPlayer();
-LogStyledMessage('Init Authorization ysdk');
-
 
                 // Additional init modules
-await LoadCloud();
-LogStyledMessage('Init Storage ysdk');
-
-await InitLeaderboards();
-LogStyledMessage('Init Leaderboards ysdk');
-
 
                 initYSDK = true;
                 if (ygGameInstance != null)
@@ -256,364 +242,13 @@ LogStyledMessage('Init Leaderboards ysdk');
             initGame = true;
 
             // Additional start modules
-setTimeout(function () {
-    if (nowFullAdOpen == true)
-        YG2Instance('OpenInterAdv');
-}, 100);
-
         }
 
         // Additional script modules
-LogStyledMessage('PluginYG2 v2.003  build: 26');
-
-var cloudSaves = NO_DATA;
-
-function SaveCloud(jsonData, flush) {
-    if (player == null) {
-        console.error('CRASH Save Cloud: ', 'Didnt have time to load');
-        return;
-    }
-    try {
-        player.setData({
-            saves: [jsonData],
-        }, flush);
-    } catch (e) {
-        console.error('CRASH Save Cloud: ', e.message);
-    }
-}
-
-function LoadCloud() {
-    return new Promise((resolve) => {
-        if (ysdk == null) {
-            Final(NO_DATA);
-            return;
-        }
-        try {
-            player.getData(["saves"]).then(data => {
-                if (data.saves) {
-                    Final(JSON.stringify(data.saves));
-                } else {
-                    Final(NO_DATA);
-                }
-            }).catch(() => {
-                console.error('Load Cloud Error!');
-                Final(NO_DATA);
-            });
-        }
-        catch (e) {
-            console.error('CRASH Load saves Cloud: ', e.message);
-            Final(NO_DATA);
-        }
-
-        function Final(res) {
-            cloudSaves = res;
-            YG2Instance('SetLoadSaves', res);
-            resolve(res);
-        }
-    });
-}
-
-let leaderboards = null;
-
-function InitLeaderboards() {
-    return new Promise((resolve) => {
-        ysdk.getLeaderboards()
-            .then(_lb => {
-                leaderboards = _lb
-                resolve(_lb);
-            })
-            .catch(e => {
-                console.error('Init Leaderboards err: ', e.message);
-                resolve(null);
-            });
-    });
-}
-
-function SetLeaderboard(name, score, extraData) {
-    if (leaderboards == null)
-        return;
-
-    try {
-        leaderboards.setLeaderboardScore(name, score, extraData);
-    } catch (e) {
-        console.error('CRASH Set Leaderboard: ', e.message);
-    }
-}
-
-function GetLeaderboard(nameLB, quantityTop, quantityAround, photoSize, auth) {
-    if (leaderboards == null)
-        return;
-
-    try {
-        var jsonEntries = {
-            technoName: '',
-            isDefault: false,
-            isInvertSortOrder: false,
-            decimalOffset: 0,
-            type: ''
-        };
-
-        leaderboards.getLeaderboardDescription(nameLB)
-            .then(res => {
-                jsonEntries.technoName = nameLB;
-                jsonEntries.isDefault = res.default;
-                jsonEntries.isInvertSortOrder = res.description.invert_sort_order;
-                jsonEntries.decimalOffset = res.description.score_format.options.decimal_offset;
-                jsonEntries.type = res.description.type;
-
-                return leaderboards.getLeaderboardEntries(nameLB, {
-                    quantityTop: quantityTop,
-                    includeUser: auth,
-                    quantityAround: quantityAround
-                });
-            })
-            .then(res => {
-                let jsonPlayers = EntriesLB(res, photoSize);
-                let combinedJson = { ...jsonEntries, ...jsonPlayers };
-
-                YG2Instance('LeaderboardEntries', JSON.stringify(combinedJson));
-            })
-            .catch(err => {
-                if (err.code === 'LEADERBOARD_PLAYER_NOT_PRESENT')
-                    LogStyledMessage('Leaderboard player not present');
-                console.error(err);
-            });
-    }
-    catch (e) {
-        console.error('CRASH Get Leaderboard: ', e.message);
-    }
-}
-
-function EntriesLB(res, photoSize) {
-    let LbdEntriesText = '';
-    let plCount = res.entries.length;
-
-    let ranks = new Array(plCount);
-    let photos = new Array(plCount);
-    let mames = new Array(plCount);
-    let scores = new Array(plCount);
-    let uniqueIDs = new Array(plCount);
-    let extraDataArray = new Array(plCount);
-
-    for (i = 0; i < plCount; i++) {
-        ranks[i] = res.entries[i].rank;
-        scores[i] = res.entries[i].score;
-        uniqueIDs[i] = res.entries[i].player.uniqueID;
-        photos[i] = res.entries[i].player.getAvatarSrc(photoSize);
-
-        if (res.entries[i].extraData == "" || res.entries[i].extraData == null)
-            extraDataArray[i] = NO_DATA;
-        else
-            extraDataArray[i] = res.entries[i].extraData;
-
-        if (res.entries[i].player.scopePermissions.public_name !== "allow")
-            mames[i] = "anonymous";
-        else
-            mames[i] = res.entries[i].player.publicName;
-
-        LbdEntriesText += ranks[i] + '. ' + mames[i] + ": " + scores[i] + '\n';
-    }
-
-    if (plCount === 0) {
-        LbdEntriesText = 'no data';
-    }
-
-    let jsonPlayers = {
-        "entries": LbdEntriesText,
-        "ranks": ranks,
-        "photos": photos,
-        "names": mames,
-        "scores": scores,
-        "uniqueIDs": uniqueIDs,
-        "extraDataArray": extraDataArray
-    };
-
-    return jsonPlayers;
-}
-
-
-let nowFullAdOpen = false;
-
-function InterAdvShow() {
-    try {
-        if (nowFullAdOpen !== true && ysdk !== null) {
-            ysdk.adv.showFullscreenAdv(
-                {
-                    callbacks: {
-                        onOpen: () => {
-                            LogStyledMessage('Open Interstitial Adv');
-                            nowFullAdOpen = true;
-                            if (initGame === true) {
-                                YG2Instance('OpenInterAdv');
-                            }
-                        },
-                        onClose: (wasShown) => {
-                            nowFullAdOpen = false;
-                            if (initGame === true) {
-                                if (wasShown) {
-                                    YG2Instance('CloseInterAdv', 'true');
-                                }
-                                else {
-                                    YG2Instance('CloseInterAdv', 'false');
-                                }
-                            }
-                            FocusGame();
-                        },
-                        onError: (error) => {
-                            console.error('Error Interstitial Adv', error);
-                            YG2Instance('ErrorInterAdv');
-                            FocusGame();
-                        }
-                    }
-                });
-        }
-    }
-    catch (e) {
-        console.error('CRASH Interstitial Adv Show: ', e.message);
-    }
-}
-
-var environmentData = NO_DATA;
-
-function RequestingEnvironmentData() {
-    return new Promise((resolve) => {
-        if (ysdk == null) {
-            Final(NO_DATA);
-            return;
-        }
-        try {
-            var browser = 'Other';
-            if (browser.includes('YaBrowser') || browser.includes('YaSearchBrowser'))
-                browser = 'Yandex';
-            else if (browser.includes('Opera') || browser.includes('OPR'))
-                browser = 'Opera';
-            else if (browser.includes('Firefox'))
-                browser = 'Firefox';
-            else if (browser.includes('MSIE'))
-                browser = 'IE';
-            else if (browser.includes('Edge'))
-                browser = 'Edge';
-            else if (browser.includes('Chrome'))
-                browser = 'Chrome';
-            else if (browser.includes('Safari'))
-                browser = 'Safari';
-
-            let jsonEnvir = {
-                "language": ysdk.environment.i18n.lang,
-                "domain": ysdk.environment.i18n.tld,
-                "deviceType": ysdk.deviceInfo.type,
-                "isMobile": ysdk.deviceInfo.isMobile(),
-                "isDesktop": ysdk.deviceInfo.isDesktop(),
-                "isTablet": ysdk.deviceInfo.isTablet(),
-                "isTV": ysdk.deviceInfo.isTV(),
-                "appID": ysdk.environment.app.id,
-                "browserLang": ysdk.environment.browser.lang,
-                "payload": ysdk.environment.payload,
-                "platform": navigator.platform,
-                "browser": browser
-            };
-
-            Final(JSON.stringify(jsonEnvir));
-            LogStyledMessage("Environment Data: " + JSON.stringify(jsonEnvir));
-        }
-        catch (e) {
-            console.error('CRASH Requesting Environment Data: ', e.message);
-            Final(NO_DATA);
-        }
-
-        function Final(res) {
-            environmentData = res;
-            YG2Instance('SetEnvirData', res);
-            resolve(res);
-        }
-    });
-}
-
-var playerData = NO_DATA;
-let player = null;
-
-function InitPlayer() {
-    return new Promise((resolve) => {
-        try {
-            if (ysdk == null) {
-                Final(NotAuthorized());
-            }
-            else {
-                let _scopes = true;
-                ysdk.getPlayer({ scopes: _scopes })
-                    .then(_player => {
-                        player = _player;
-
-                        let playerName = player.getName();
-                        let playerPhoto = player.getPhoto('medium');
-
-                        if (!_scopes) {
-                            playerName = "anonymous";
-                            playerPhoto = "NO_DATA";
-                        }
-
-                        if (player.getMode() === 'lite') {
-                            LogStyledMessage('Not Authorized');
-                            Final(NotAuthorized());
-                        }
-                        else {
-                            let authJson = {
-                                "playerAuth": "resolved",
-                                "playerName": playerName,
-                                "playerId": player.getUniqueID(),
-                                "playerPhoto": playerPhoto,
-                                "payingStatus": player.getPayingStatus()
-                            };
-                            Final(JSON.stringify(authJson));
-                        }
-                    }).catch(e => {
-                        console.error('Authorized err: ', e.message);
-                        Final(NotAuthorized());
-                    });
-            }
-        }
-        catch (e) {
-            console.error('CRASH init Player: ', e.message);
-            Final(NotAuthorized());
-        }
-
-        function Final(res) {
-            playerData = res;
-            YG2Instance('SetAuth', res);
-            resolve(res);
-        }
-    });
-}
-
-function NotAuthorized() {
-    let authJson = {
-        "playerAuth": "rejected",
-        "playerName": "unauthorized",
-        "playerId": "unauthorized",
-        "playerPhoto": "null",
-        "payingStatus": "unknown"
-    };
-    return JSON.stringify(authJson);
-}
-
-function OpenAuthDialog() {
-    if (ysdk !== null) {
-        try {
-            ysdk.auth.openAuthDialog().then(() => {
-                InitPlayer(true)
-                    .then(() => {
-                        YG2Instance('GetDataInvoke');
-                    });
-            });
-        }
-        catch (e) {
-            LogStyledMessage('CRASH Open Auth Dialog: ', e.message);
-        }
-    }
-}
-
 
         document.body.appendChild(script);
     </script>
+
+<script>console.log('%c' + 'PluginYG2 v2.003  build: 27', 'color: #FFDF73; background-color: #454545');</script>
 </body>
 </html>

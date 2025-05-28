@@ -113,9 +113,3 @@ body {
         transform: rotate(360deg);
     }
 }
-
-
-
-#unity-canvas {
-    background: linear-gradient(140deg, rgba(255, 211, 37, 1) 0%, rgba(91, 22, 255, 1) 100%);
-}
